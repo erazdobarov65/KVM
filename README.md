@@ -11,7 +11,7 @@ tested with OLVM v4.3, v4.4, oVirt v4.4
 
 ---------------------------------------
 
-## Unattched_disks
+## Unattached_disks
 
 Script looks into specified OLVM/oVirt URL and searches for unattached disks, i.e. disks that are not connected to VM. Information about disks (service name, storage name, disk name, disk size) is saved into csv file. ISO disks are also found and they are saved into second scv. The script may be used to keep track of unattached disks and optimize storage capacity by removing forgotten disks. 
 
