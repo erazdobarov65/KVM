@@ -1,6 +1,5 @@
 # KVM
 ---
-
 Scripts to support KVM virtual infrastructure
 
 ---
