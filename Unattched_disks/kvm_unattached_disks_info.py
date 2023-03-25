@@ -8,17 +8,16 @@ import ovirtsdk4.types as types
 import re, sys, base64, requests, getopt, socket, csv, os
 from os.path import exists
 
-
-# Задаем параметры подключения
+#Enter connection details
 OLVM_USER = "roadmin@internal" #Read-only admin
-OLVM_PASS = "OL2021&^vmpaSS-4"
-OLVM_URLs = ["https://bs-olvm.ftc.ru/ovirt-engine/api"]
+OLVM_PASS = "yourpassword"
+OLVM_URLs = ["https://kvm-address/ovirt-engine/api"]
 
-#Выключаем варнинги при проверке url без серта
+#Turn off warnings when connecting without certs
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-#Проверяем доступность oVirt
+#Check if ovirt service is reachable
 def getStatuscode(url,user,passw):
     try:
         r = requests.head(url,verify=False,timeout=5,auth = (user, passw))
@@ -26,7 +25,7 @@ def getStatuscode(url,user,passw):
     except:
         return -1
 
-# Функция соединения с OLVM
+#Function to establish connection with KVM
 def olvm_connect(OLVM_URL, OVIRT_CA):
     connection = sdk.Connection(
         url=OLVM_URL,
@@ -39,28 +38,27 @@ def olvm_connect(OLVM_URL, OVIRT_CA):
     )
     return connection
 
-    #Проверяем еть ли такой серт
+#Check certificate availability
 def getStatusCA(ca_file):
     file_exists = exists(ca_file)
     return file_exists
 
 
-#Очищаем csv
+#Function to clean up csv file
 def clearCSV(cloneinfo):
     filename = cloneinfo
     f = open(filename, "w+")
     f.close()
 
 
-#Добавляем записи в csv
+#Fuction to add entries into csv file
 def appendCSV(title, cloneinfo):
     with open(cloneinfo, 'a', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile, delimiter=';')
         writer.writerows(title)
 
-
+#Function to make an array of udisks attached to VMs (they should be excluded)
 def attachedDisks(connection):
-    # Get all disks in datacenter
     vms_service = connection.system_service().vms_service()
     vms = vms_service.list()
     attached_disks = []
@@ -76,8 +74,9 @@ def attachedDisks(connection):
     #print(attached_disks)
     return attached_disks
 
+
+#Function to make an array of disks attached to templates (they should be excluded)
 def templateDisks(connection):
-    # Get all disks in datacenter
     templates_service = connection.system_service().templates_service()
     tms = templates_service.list()
     template_disks = []
@@ -93,6 +92,8 @@ def templateDisks(connection):
     #print(template_disks)
     return template_disks
 
+
+#Function to make an array of disks using disk service. i.e. all disks that can be found on storage
 def allDisks(connection):
     # Get all disks in datacenter
     disk_service = connection.system_service().disks_service()
@@ -107,6 +108,7 @@ def allDisks(connection):
     #print(unattached_disks)
     return all_disks
 
+#Function to make an array of ISO disks (saved into own csv file)
 def isoDisks(connection):
     # Get all disks in datacenter
     disk_service = connection.system_service().disks_service()
@@ -123,16 +125,17 @@ def isoDisks(connection):
     #print(iso_disks)
     return iso_disks
 
+# Function to create csv with unattached disks. 
 def findUnattachedDisks(attached_disks, all_disks, template_disks, iso_disks, OLVM_SERVICE_NAME, connection, diskinfo):
     unattached_disks = []
     olvm_service = OLVM_SERVICE_NAME
     for disk in all_disks:
-        if disk not in attached_disks and disk != 'OVF_STORE':
+        if disk not in attached_disks and disk != 'OVF_STORE': #Exclude disks attached to VM and system dusks with name 'OVF_STORE'
             unattached_disks.append(disk)
     #print(unattached_disks)
-    for disk in iso_disks:
+    for disk in iso_disks: #Exclude ISO disks
         unattached_disks.remove(disk)
-    #print(unattached_disks)
+    #print(unattached_disks) #Exclude template disks
     for disk in unattached_disks:
         if disk in template_disks:
             unattached_disks.remove(disk)
@@ -140,7 +143,7 @@ def findUnattachedDisks(attached_disks, all_disks, template_disks, iso_disks, OL
     disk_service = connection.system_service().disks_service()
     disks = disk_service.list()
 
-    # Формируем массив из неприатаченных дисков
+    #make an array of unattched disks and save it into csv
     for disk in disks:
         disk_name = disk.name
         if disk.name in unattached_disks:
@@ -155,14 +158,14 @@ def findUnattachedDisks(attached_disks, all_disks, template_disks, iso_disks, OL
 
     return disk_param_array
     #print(unattached_disks)
-    
-def findIsoDisks(iso_disks, OLVM_SERVICE_NAME, connection, diskiso):
 
+#Function to create csv of ISO disks
+def findIsoDisks(iso_disks, OLVM_SERVICE_NAME, connection, diskiso):
     disk_service = connection.system_service().disks_service()
     disks = disk_service.list()
     olvm_service = OLVM_SERVICE_NAME
-
-    # Формируем массив из неприатаченных дисков
+    
+    #make an array of ISO disks and save it into csv
     for disk in disks:
         disk_name = disk.name
         if disk.name in iso_disks:
@@ -174,50 +177,33 @@ def findIsoDisks(iso_disks, OLVM_SERVICE_NAME, connection, diskiso):
             sd_name = storage_domain.name
             disk_iso_array = [[olvm_service, sd_name, disk_name, disk_size_gb]]
             appendCSV(disk_iso_array, diskiso)
-
+            
     return disk_iso_array
     #print(unattached_disks)
 
 def main():
-    #cloneinfo = "/var/lib/rundeck/projects/Hostinfo/etc/data_vm_olvm/cloneinfo.csv"
-    diskinfo = "/u/ckdba/unix_service/Infotask/check_unattached_vm_disk/csv/diskinfo_olvm.csv"
-    diskiso = "/u/ckdba/unix_service/Infotask/check_unattached_vm_disk/csv/diskiso_olvm.csv"
-    #Очищаем CSV
+    diskinfo = "../csv/diskinfo_olvm.csv" # place csv file with unattched disks into 'csv' folder
+    diskiso = "../csv/diskiso_olvm.csv" # place csv file with ISO disks into 'csv' folder
+    
+    #Clean up csv files
     clearCSV(diskinfo)
     clearCSV(diskiso)
-    #arg_olvm = checkOpts(sys.argv[1:]) # Проверяем заданы ли  аргумент OLVM при запуске скрипта
-    #CA_PATH = "../ca/" #Ресурс-файл со всеми активными хостами на локальном компе
-    CA_PATH = "/u/ckdba/vm_infra/OLVM/ca/" #Ресурс-файл со всеми активными хостами в Rundeck
-    #VIRT_NAME = 'kvm'
+    CA_PATH = "../ca/" #File with KVM cert in 'ca' folder
 
-   
-    for OLVM_URL in OLVM_URLs: #Перебираем адреса OLVM из массива
-        OLVM_SERVICE_NAME = OLVM_URL[+8:-17] #удаляем первые 8 символов и последние 17
+    for OLVM_URL in OLVM_URLs: #Loop throuth KVM URLs array
+        OLVM_SERVICE_NAME = OLVM_URL[+8:-17] #remove first 8 and last 17 symbols from KVM URL
         OVIRT_CA=CA_PATH + "ca-" + OLVM_SERVICE_NAME + ".pem"
         #print(OLVM_NAME)
         check_ca = getStatusCA(OVIRT_CA)
         check_ca = str(check_ca)
-        #global connection
         if check_ca == "True":
             connection = olvm_connect(OLVM_URL, OVIRT_CA)
-            #datacenter_service = connection.system_service().data_centers_service()
-            #dcs = datacenter_service.list()
-            #sds_service = connection.system_service().storage_domains_service()
-            #sds = sds_service.list()
-            #vms_service = connection.system_service().vms_service()
-            #vms = vms_service.list()
-            #for sd in sds:
-            #   sd_service = sds_service.sd_service(sd.id)
-            #   diskInfo(connection, sd_service)
             attached_disks = attachedDisks(connection)
             template_disks = templateDisks(connection)
             all_disks = allDisks(connection)
             iso_disks = isoDisks(connection)
             findIsoDisks(iso_disks, OLVM_SERVICE_NAME, connection, diskiso)
             findUnattachedDisks(attached_disks, all_disks, template_disks, iso_disks, OLVM_SERVICE_NAME, connection, diskinfo)
-            #appendCSV(disk_param_array, diskinfo) 
-                
-        
     connection.close()
    
 
