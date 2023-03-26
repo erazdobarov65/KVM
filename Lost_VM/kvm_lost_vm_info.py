@@ -95,7 +95,7 @@ def VmInfo(vm,connection):
 def DNSresolve(vm_name):
     vm_name = vm_name
     resolver = dns.resolver.Resolver()
-    resolver.nameservers = ['192.168.92.20']
+    resolver.nameservers = ['...'] #Enter your DNS IP here
     try:
         resolver.query(vm_name, "A")
     except dns.exception.DNSException:
