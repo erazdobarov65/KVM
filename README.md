@@ -21,3 +21,12 @@ Script may be run from command line or used in automation tools like rundeck.
 
 tested with OLVM v4.3, v4.4, oVirt v4.4
 
+---
+
+## Add_vlan
+
+This is an interactive script that adds VLANs from csv file to the specified datacenter of KVM server/
+
+Script is to be run from the command line.
+
+tested with OLVM v4.3, v4.4, oVirt v4.
