@@ -30,3 +30,14 @@ This is an interactive script that adds VLANs from csv file to the specified dat
 Script is to be run from the command line.
 
 tested with OLVM v4.3, v4.4, oVirt v4.
+
+---
+
+## Move disks between KVM data domains
+
+This is an interactive script that moves VM disks between storage data domains. Disk names are accepted as command line parameters, seprated by space. Before running this script make sure to prepare csv file with disk names that need to be moved and their target storage domain ids.
+
+Usage example:
+<pre>
+#python3 move_disks.py server1_backups server1_system
+</pre>
