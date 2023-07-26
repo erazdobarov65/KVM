@@ -47,9 +47,9 @@ def check_disks(sd_orig_name, disk, connection):
     sd_new_name = storage_domain.name
    
     if sd_new_name != sd_orig_name:
-        print(f"Диск {disk.name} был перемещен из {sd_orig_name} в {sd_new_name}")
+        print(f"Disk {disk.name} was moved from {sd_orig_name} to {sd_new_name}")
     else:
-        print(f"Диск {disk.name} не был перемещен")
+        print(f"Disk {disk.name} was NOT moved")
 
 
 #Function for moving disks to another domain
@@ -67,7 +67,7 @@ def move_disks(disk_domain, disk, connection):
             if disk.status == types.DiskStatus.OK:
                 break
     except sdk.Error: 
-        print(f"Диск {disk.name} уже находится в нужном хранилище")
+        print(f"Disk {disk.name} is already in target storage domain")
  
 def main():
     CA_PATH = "../ca/" #path to certs
