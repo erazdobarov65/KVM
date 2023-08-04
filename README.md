@@ -7,6 +7,8 @@ Scripts to support KVM virtual infrastructure
 
 Script looks into specified OLVM/oVirt URL and searches for VMs that do not resolve in DNS. This may indicate a stray VM, test VM or a VM clone. VM data (cluster name, VM name, creation date, disk summ size) is saved into csv. This may be used to make an inventory of unused VMs to keep KVM infrastructure clean.
 
+**Pls. note that direct reference to libvirt API vms object *creation_time* provides time when original VM was created, NOT its clone. That's why the script relies on *get_vm_time* function to extract correct creation tine directly from ovirt engine PostgreSQL database**
+
 Script may be run from command line or used in automation tools like rundeck.
 
 tested with OLVM v4.3, v4.4, oVirt v4.4
