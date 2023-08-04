@@ -4,7 +4,7 @@
 import logging, dns.resolver
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
-import re, sys, base64, requests, getopt, socket, csv, os
+import re, sys, base64, requests, getopt, socket, csv, os, paramiko, warnings
 from os.path import exists
 
 
@@ -65,9 +65,10 @@ def VmInfo(vm,connection):
 
     # VM_name
     vm_cluster_id = vm.cluster.id
+    #virt_name = VIRT_NAME
     vm_name = vm.name
 
-    #Search for cluster name by its id
+    #Search for cluster name by its id 
     clusters_service = connection.system_service().clusters_service()
     clusters = clusters_service.list()
     for cluster in clusters:
@@ -75,7 +76,8 @@ def VmInfo(vm,connection):
             vm_cluster_name = cluster.name
 
     #VM creation date
-    vm_creation_date = vm_service.get().creation_time.strftime("%Y-%m-%d %H:%M")
+    vm_creation_date = get_vm_time(vm_name)
+    vm_creation_date = vm_creation_date[:16]
 
     #VM_summ_disks_size
     disk_attachments_service = vm_service.disk_attachments_service()
@@ -87,50 +89,88 @@ def VmInfo(vm,connection):
         vm_disk_gb = vm_disk_by / 1024 / 1024 /1024
         vm_disk_gb_round = (round (vm_disk_gb))
         vm_disk_summ = vm_disk_summ + vm_disk_gb_round
-    #make an array with VM information
+    # print ("Summary disk size   : {} GB" . format(vm_disk_summ))
+
+   
     vm_param_array = [[vm_cluster_name, vm_name, vm_creation_date, vm_disk_summ]]
     return vm_param_array
 
-#Function to resolve VM into DNS by its name
+#Function to resolve in DNS by VM name
 def DNSresolve(vm_name):
     vm_name = vm_name
-    resolver = dns.resolver.Resolver()
-    resolver.nameservers = ['...'] #Enter your DNS IP here
     try:
-        resolver.query(vm_name, "A")
-    except dns.exception.DNSException:
+        socket.gethostbyname(vm_name)
+    except socket.gaierror:
         dns_resolv_status = "error"
         dns_resolv_status = str(dns_resolv_status)
-                    #print(dns_resolv_status)
     else:
         dns_resolv_status = "ok"
     return dns_resolv_status
 
+#Function to extract VM creation time form PostgreSQL database on ovirt-engine host
+def get_vm_time(vm_name):
+    host = 'ovirt-engine' #Enter yout oVirt engine name here
+    user = 'ovirt-user' #username used to connect to postgreSQL DB on ovirt-engine
+    pubkey = '/home/ovirt-user/.ssh/ovirt-user'
+    #command to execute on ovirt-engine host
+    command = f'sudo su postgres -c "psql -d engine -c \\"select _create_date from vm_static where vm_name=\'{vm_name}\'\\" " 2>/dev/null | sed -n 3p'
+    try: #Trying to connect via ssh to ovirt-engine
+        sshcon = paramiko.SSHClient()  # will create the object
+        sshcon.set_missing_host_key_policy(paramiko.AutoAddPolicy())# no known_hosts error
+        sshcon.connect(hostname=host, username=user, key_filename=pubkey, timeout=10) # no passwd needed
+        #Extract VM creation time from DB
+        stdin, stdout, stderr = sshcon.exec_command(command)
+        vm_time = stdout.read().decode('utf-8').strip()
+    except BlockingIOError:
+        vm_time = "NO_DATA"
+    except paramiko.ssh_exception.NoValidConnectionsError:
+        vm_time = "NO_DATA"
+    except paramiko.ssh_exception.socket.error:
+        vm_time = "NO_DATA"
+    except paramiko.ssh_exception.AuthenticationException:
+        vm_time = "NO_DATA"
+    except paramiko.ssh_exception.SSHException:
+        vm_time = "NO_DATA"
+
+    #print(vm_time)
+    return vm_time
+
 def main():
-    csvinfo = "../csv/csvinfokvm.csv" # place csv file into csv folder
-    #clean up csv file
-    clearCSV(csvinfo)
-    CA_PATH = "../ca/" #File with KVM cert
+    # Store csv file with VM data inside /tmp directory
+    cloneinfodir = "/tmp/data_vm_backup/"
+    cloneinfocsv = cloneinfodir + "cloneinfokvm.csv"
+    #Create /tmp/data_vm_backup if does not exist
+    if not os.path.exists(cloneinfodir):
+        os.mkdir(cloneinfodir)
+
+    if os.path.exists(cloneinfocsv):
+        # clean old csv file
+        clearCSV(cloneinfocsv)
+
+    # Store your CA cert inside ca directory
+    CA_PATH = "../ca"
    
-    for OLVM_URL in OLVM_URLs: #Loop throuth KVM URLs array
-        OLVM_NAME = OLVM_URL[+8:-17] #remove first 8 and last 17 symbols from KVM URL
-        OVIRT_CA=CA_PATH + "ca-" + OLVM_NAME + ".pem"
+    for OLVM_URL in OLVM_URLs: #Loop through all oVirt/OLVM engines
+        OLVM_NAME = OLVM_URL[+8:-17] #strip first 8 and last 17 symbols
+        OVIRT_CA=CA_PATH + "ckca.cer"
         #print(OLVM_NAME)
         check_ca = getStatusCA(OVIRT_CA)
         check_ca = str(check_ca)
-        #make global connection to KVM
+        #Setup global connection to oVirt engine
         if check_ca == "True":
             connection = olvm_connect(OLVM_URL, OVIRT_CA)
             vms_service = connection.system_service().vms_service()
             vms = vms_service.list()
             for vm in vms:
                 vm_name = vm.name
-                #resole VM in DNS
-                dns_resolv_state = DNSresolve(vm_name)
-                #if VM is not resolved, collect its data and save into csv
-                if dns_resolv_state == "error":
-                    vm_param_array = VmInfo(vm,connection)
-                    appendCSV(vm_param_array, csvinfo)  
+                vm_status = vm.status
+                vm_status = str(vm_status)
+                if vm_status == "down":
+                    dns_resolv_state = DNSresolve(vm_name)
+                    if dns_resolv_state == "error":
+                        vm_param_array = VmInfo(vm,connection)
+                        appendCSV(vm_param_array, cloneinfocsv)  
+                #clone_info(vms_service, dcs_service)
         
     connection.close()
    
