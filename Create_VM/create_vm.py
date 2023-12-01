@@ -1,4 +1,8 @@
-# Внимание!!!
+##############################################################################################################################################
+# Скрипт для массового добавления Виртуальных машин в выбранный кластер
+# Запускается из командной строки без аргументов.
+# Работает в интерактивном режиме
+# !!!Внимание!!!
 # Перед использованием скрипта задайте свои значения переменных:
 # OVIRT_USER -  пользователь ovirt с админскими правами (на создание ВМ)
 # OVIRT_PASS - пароль пользователя
@@ -18,7 +22,7 @@ from colorama import Fore, Back, Style, init
 
 # Задаем параметры подключения
 
-OVIRT_USER = "evgeny@internal" #Read-only admin
+OVIRT_USER = "evgeny@internal" #admin
 OVIRT_PASS = "@ASDqwe123"
 OVIRT_URL = "https://engine.redvirt.tst/ovirt-engine/api"
 
@@ -59,18 +63,25 @@ def SelectCluster(connection):
         for cluster in clusters:
             cluster_num += 1
             cluster_arr.append(cluster.id)
-            print(f"{cluster_num}: {cluster.name}")
+            print(f"{cluster_num}: {cluster.name}") 
         cluster_index = input(f"Введите номер кластера > ")
-        cluster_true_index = int(cluster_index) - 1
         try:
-            CLUSTER_ID = cluster_arr[cluster_true_index]
+            cluster_index = int(cluster_index) - 1
+        except ValueError:
+            print(f"Введен неправильный номер кластера, повторите снова")
+            cluster_num = 0
+        try:
+            CLUSTER_ID = cluster_arr[cluster_index]
             print(CLUSTER_ID)
             return CLUSTER_ID
             break
         except IndexError:
             print(f"Введен неправильный номер кластера, повторите снова")
             cluster_num = 0
-    
+        except TypeError:
+            print(f"Введен неправильный номер кластера, повторите снова")
+            cluster_num = 0
+
 
 #Функция выбора шаблона на базе которого будет создана ВМ
 def SelectTemplate(connection, CLUSTER_ID):
@@ -89,13 +100,20 @@ def SelectTemplate(connection, CLUSTER_ID):
             except AttributeError:
                 pass
         tmpl_index = input(f"Введите номер шаблона > ")
-        tmpl_true_index = int(tmpl_index) - 1
         try:
-            TMPL_ID = tms_arr[tmpl_true_index]
+            tmpl_index = int(tmpl_index) - 1
+        except ValueError:
+            print(f"Введен неправильный номер шаблона, повторите снова")
+            tms_num = 0
+        try:
+            TMPL_ID = tms_arr[tmpl_index]
             print(TMPL_ID)
             return TMPL_ID
             break
         except IndexError:
+            print(f"Введен неправильный номер шаблона, повторите снова")
+            tms_num = 0
+        except TypeError:
             print(f"Введен неправильный номер шаблона, повторите снова")
             tms_num = 0
 
@@ -203,7 +221,7 @@ def RenameDisks(connection,NEW_VM_NAME):
             disk_id = 1
             disk_attachments = disk_attachments_service.list()
             for disk_attachment in disk_attachments:
-                disk = connection.follow_link(disk_attachment.disk)
+                #disk = connection.follow_link(disk_attachment.disk)
                 #vm_disk_by = disk.provisioned_size
                 #vm_disk_gb = vm_disk_by / 1024 / 1024 /1024
                 #vm_disk_gb_round = (round (vm_disk_gb))
@@ -236,8 +254,14 @@ def main():
     connection = ovirt_connect(OVIRT_URL)
     CLUSTER_ID = SelectCluster(connection)
     TMPL_ID = SelectTemplate(connection, CLUSTER_ID)
-    VM_NUM = input(f"Введите требуемое количество ВМ >")
-    VM_NUM = int(VM_NUM) + 1
+    while True:
+        VM_NUM = input(f"Введите требуемое количество ВМ >")
+        try:
+            VM_NUM = int(VM_NUM) + 1
+        except ValueError:
+            print(f"Введите требуемое количество ВМ еще раз")
+        else:
+            break
     for i in range(1, VM_NUM):
         NEW_VM_NAME = 'test-vm-'+str(i)
         #print(NEW_VM_NAME)
