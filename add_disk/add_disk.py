@@ -23,7 +23,7 @@ from datetime import datetime
 # Задаем параметры подключения
 
 OVIRT_USER = "evgeny@internal" #admin
-OVIRT_PASS = "@ASDqwe123"
+OVIRT_PASS = ""
 OVIRT_URL = "https://engine.redvirt.tst/ovirt-engine/api"
 
 #Выключаем варнинги при проверке url без серта
