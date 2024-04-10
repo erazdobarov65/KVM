@@ -1,1 +1,22 @@
+---
+- name: oVirt ansible collection
+  hosts: localhost
+  connection: local
+  vars_files:
+     # Contains encrypted `engine_password` varibale using ansible-vault
+     #- passwords.yml
+  tasks:
+    - name: Login
+      ovirt_auth:
+          url: "https://engine.redvirt.tst/ovirt-engine/api"
+          password: "password"
+          username: "admin@internal"
+    - name: Create vm
+      ovirt_vm:
+        auth: "{{ ovirt_auth }}"
+        name: vm_test_ansible
+        state: present
+        cluster: Default
+  collections:
+    - ovirt.ovirt.ovirt_vm
 
